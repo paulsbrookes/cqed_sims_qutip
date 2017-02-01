@@ -5,7 +5,8 @@ from scipy.fftpack import fft
 import matplotlib.pyplot as plt
 import yaml
 
-class parameters:
+
+class Parameters:
     def __init__(self, wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels):
         self.wc = wc
         self.wq = wq
@@ -16,6 +17,15 @@ class parameters:
         self.kappa = kappa
         self.t_levels = t_levels
         self.c_levels = c_levels
+
+
+class Results:
+    def __init__(self, wd_points, transmissions, abs_transmissions, params):
+        self.params = params
+        self.wd_points = wd_points
+        self.transmissions = transmissions
+        self.abs_transmissions = abs_transmissions
+
 
 def hamiltonian(params, wd):
     a = tensor(destroy(params.c_levels), qeye(params.t_levels))
@@ -103,24 +113,10 @@ def y_lim_calc(y_points):
 
 def sweep(eps, wd_lower, wd_upper, params, fidelity):
     params.eps = eps
-    save = 1
     wd_points = np.linspace(wd_lower, wd_upper, 10)
     transmissions = transmission_calc_array(params, wd_points)
     abs_transmissions = np.absolute(transmissions)
     new_wd_points = new_points(wd_points, abs_transmissions, fidelity)
-
-    fig, ax = plt.subplots(1, 1)
-    ax.set_xlim(wd_lower, wd_upper)
-    y_limits = y_lim_calc(abs_transmissions)
-    ax.set_ylim(y_limits[0], y_limits[1])
-    ax.set_xlabel('Cavity drive frequency (GHz)')
-    ax.set_ylabel('|<a>|')
-
-    ax.hold(True)
-    plt.show(False)
-    plt.draw()
-    background = fig.canvas.copy_from_bbox(ax.bbox)
-    points = ax.plot(wd_points, abs_transmissions, 'o')[0]
 
     while (len(new_wd_points) > 0):
         new_transmissions = transmission_calc_array(params, new_wd_points)
@@ -133,40 +129,21 @@ def sweep(eps, wd_lower, wd_upper, params, fidelity):
         transmissions = transmissions[sort_indices]
         abs_transmissions = abs_transmissions[sort_indices]
         new_wd_points = new_points(wd_points, abs_transmissions, fidelity)
-        points.set_data(wd_points, abs_transmissions)
-        fig.canvas.restore_region(background)
-        ax.draw_artist(points)
-        fig.canvas.blit(ax.bbox)
-        y_limits = y_lim_calc(abs_transmissions)
-        ax.set_ylim(y_limits[0], y_limits[1])
 
-
-    if save == 1:
-        np.savetxt('results/abs_transmissions.csv', abs_transmissions, delimiter=',')
-        np.savetxt('results/drive_frequencies.csv', wd_points, delimiter=',')
-
-        params_dic = {'f_c': params.wc,
-                      'f_q': params.wq,
-                      'epsilon': params.eps,
-                      'g': params.g,
-                      'kappa': params.kappa,
-                      'gamma': params.gamma,
-                      'transmon_levels': params.t_levels,
-                      'cavity_levels': params.c_levels}
-
-        with open('results/parameters.yml', 'w') as outfile: yaml.dump(params_dic, outfile, default_flow_style = True)
-
-    plt.scatter(wd_points, abs_transmissions)
-    plt.show()
+    results = Results(wd_points, transmissions, abs_transmissions, params)
+    return results
 
 
 
 if __name__ == '__main__':
 
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+    params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
     eps = 0.0001
-    fidelity = 0.05
+    fidelity = 0.5
     wd_lower = 10.4
     wd_upper = 10.55
-    sweep(eps, wd_lower, wd_upper, params, fidelity)
+    results = sweep(eps, wd_lower, wd_upper, params, fidelity)
+
+    plt.plot(results.wd_points, results.abs_transmissions)
+    plt.show()

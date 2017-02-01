@@ -25,7 +25,7 @@ def hamiltonian(params, wd):
         + params.eps * (a + a.dag())
     return H
 
-def sweep(params, wd_points):
+def transmission_calc_array(params, wd_points):
 
     transmissions = parallel_map(transmission_calc, wd_points, (params,), num_cpus = 10)
     transmissions = np.array(transmissions)
@@ -101,17 +101,11 @@ def y_lim_calc(y_points):
     y_lim_l = y_min - buffer_fraction * range
     return np.array([y_lim_l, y_lim_u])
 
-
-if __name__ == '__main__':
-
-    #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+def sweep(eps, wd_lower, wd_upper, params, fidelity):
+    params.eps = eps
     save = 1
-    fidelity = 0.05
-    wd_lower = 10.4
-    wd_upper = 10.55
     wd_points = np.linspace(wd_lower, wd_upper, 10)
-    transmissions = sweep(params, wd_points)
+    transmissions = transmission_calc_array(params, wd_points)
     abs_transmissions = np.absolute(transmissions)
     new_wd_points = new_points(wd_points, abs_transmissions, fidelity)
 
@@ -129,7 +123,7 @@ if __name__ == '__main__':
     points = ax.plot(wd_points, abs_transmissions, 'o')[0]
 
     while (len(new_wd_points) > 0):
-        new_transmissions = sweep(params, new_wd_points)
+        new_transmissions = transmission_calc_array(params, new_wd_points)
         new_abs_transmissions = np.absolute(new_transmissions)
         wd_points = np.concatenate([wd_points, new_wd_points])
         transmissions = concatenate([transmissions, new_transmissions])
@@ -164,3 +158,15 @@ if __name__ == '__main__':
 
     plt.scatter(wd_points, abs_transmissions)
     plt.show()
+
+
+
+if __name__ == '__main__':
+
+    #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
+    params = parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+    eps = 0.0001
+    fidelity = 0.05
+    wd_lower = 10.4
+    wd_upper = 10.55
+    sweep(eps, wd_lower, wd_upper, params, fidelity)
