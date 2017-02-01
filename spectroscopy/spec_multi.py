@@ -133,17 +133,24 @@ def sweep(eps, wd_lower, wd_upper, params, fidelity):
     results = Results(wd_points, transmissions, abs_transmissions, params)
     return results
 
+def multi_sweep(eps_array, wd_lower, wd_upper, params, fidelity):
+    multi_results = dict()
+    for eps in eps_array:
+        multi_results[eps] = sweep(eps, wd_lower, wd_upper, params, fidelity)
+    return multi_results
+
+
 
 
 if __name__ == '__main__':
-
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
     params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
     eps = 0.0001
     fidelity = 0.5
     wd_lower = 10.4
     wd_upper = 10.55
-    results = sweep(eps, wd_lower, wd_upper, params, fidelity)
-
+    eps_array = np.linspace(0.0001, 0.0002, 2)
+    multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, fidelity)
+    results = multi_results[0.0002]
     plt.plot(results.wd_points, results.abs_transmissions)
     plt.show()
