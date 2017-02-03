@@ -164,7 +164,7 @@ def sweep(eps, wd_lower, wd_upper, params, fidelity):
 if __name__ == '__main__':
 
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+    params = parameters(10.4262, 9.4914, 0.0001, 0.275, -0.097, 0.00146, 0.000833, 2, 10)
     eps = 0.0001
     fidelity = 0.05
     wd_lower = 10.4

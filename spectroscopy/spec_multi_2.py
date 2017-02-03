@@ -26,13 +26,35 @@ class Results:
         self.transmissions = transmissions
         self.abs_transmissions = abs_transmissions
 
+
 class CurvatureInfo:
-    def __init__(self, wd_points, transmissions):
+    def __init__(self, wd_points, transmissions, threshold = 0.05):
+        self.threshold = threshold
         self.wd_points = wd_points
         self.transmissions = transmissions
+        self.n_points = transmissions.size
+        self.curvature_positions, self.curvatures = derivative(wd_points, transmissions, 2)
+        self.mean_curvatures = moving_average(np.absolute(self.curvatures), 2)
+        #self.midpoint_curvatures = \
+        #    np.concatenate((self.curvatures[0], self.mean_curvatures, self.curvatures[self.n_points - 3]))
+        self.midpoint_curvatures = \
+            np.concatenate((np.array([self.curvatures[0]]), self.mean_curvatures))
+        self.midpoint_curvatures = \
+            np.concatenate((self.midpoint_curvatures, np.array([self.curvatures[self.n_points - 3]])))
+        self.midpoint_transmissions = moving_average(self.transmissions, 2)
+        self.midpoint_curvatures_normed = self.midpoint_curvatures / self.midpoint_transmissions
+        self.midpoints = moving_average(self.wd_points, 2)
+        self.intervals = np.diff(self.wd_points)
+        self.number_of_sections_required = \
+            np.ceil(self.intervals * np.sqrt(self.midpoint_curvatures_normed / threshold))
+
+
+def moving_average(interval, window_size):
+    window = np.ones(int(window_size)) / float(window_size)
+    averages = np.convolve(interval, window, 'same')
+    return averages[window_size - 1 : averages.size]
 
 def derivative(x, y, n_derivative = 1):
-    
     derivatives = np.zeros(y.size - 1)
     positions = np.zeros(x.size - 1)
     for index in np.arange(y.size - 1):
@@ -43,30 +65,7 @@ def derivative(x, y, n_derivative = 1):
 
     if n_derivative > 1:
         positions, derivatives = derivative(positions, derivatives, n_derivative - 1)
-
     return positions, derivatives
-
-def curvature_vector(wd_points, transmissions):
-
-    is_ordered = all([wd_points[i] <= wd_points[i + 1] for i in xrange(len(wd_points) - 1)])
-    assert is_ordered, "Vector of wd_points is not ordered."
-    assert len(wd_points) == len(transmissions), "Vectors of wd_points and transmissions are not of equal length."
-
-    metric_vector = []
-    for index in range(len(wd_points) - 2):
-        metric = curvature(wd_points[index:index + 3], transmissions[index:index + 3])
-        metric_vector.append(metric)
-    return metric_vector
-
-def curvature(wd_triplet, transmissions_triplet):
-
-    wd_delta_0 = wd_triplet[1] - wd_triplet[0]
-    wd_delta_1 = wd_triplet[2] - wd_triplet[1]
-    transmissions_delta_0 = transmissions_triplet[1] - transmissions_triplet[0]
-    transmissions_delta_1 = transmissions_triplet[2] - transmissions_triplet[1]
-    metric = 2 * (wd_delta_1 * transmissions_delta_1 - wd_delta_0 * transmissions_delta_0) / (wd_delta_0 + wd_delta_1)
-    abs_normalised_metric = np.absolute(metric / transmissions_triplet[1])
-    return abs_normalised_metric
 
 def hamiltonian(params, wd):
     a = tensor(destroy(params.c_levels), qeye(params.t_levels))
@@ -99,30 +98,13 @@ def transmission_calc(wd, params):
 
     return transmission
 
-def new_points(wd_points, transmissions, threshold):
-
-    metric_vector = curvature_vector(wd_points, transmissions)
-    indices = np.array([index for index, metric in enumerate(metric_vector) if metric > threshold]) + 1
-    new_wd_points = generate_points(wd_points, indices)
-
-    return new_wd_points
-
-def generate_points(wd_points, indices):
-    n_points = 6
-    new_wd_points = np.array([])
-    for index in indices:
-        multi_section = np.linspace(wd_points[index - 1], wd_points[index + 1], n_points)
-        new_wd_points = np.concatenate((new_wd_points, multi_section))
-    unique_set = set(new_wd_points) - set(wd_points)
-    new_wd_points_unique = np.array(list(unique_set))
-    return new_wd_points_unique
-
-def sweep(eps, wd_lower, wd_upper, params, fidelity):
+def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
     wd_points = np.linspace(wd_lower, wd_upper, 10)
     transmissions = transmission_calc_array(params, wd_points)
     abs_transmissions = np.absolute(transmissions)
-    new_wd_points = new_points(wd_points, abs_transmissions, fidelity)
+    curvature_info = CurvatureInfo(wd_points, abs_transmissions, threshold)
+    new_wd_points = curvature_info.new_points()
 
     while (len(new_wd_points) > 0):
         new_transmissions = transmission_calc_array(params, new_wd_points)
@@ -134,12 +116,13 @@ def sweep(eps, wd_lower, wd_upper, params, fidelity):
         wd_points = wd_points[sort_indices]
         transmissions = transmissions[sort_indices]
         abs_transmissions = abs_transmissions[sort_indices]
-        new_wd_points = new_points(wd_points, abs_transmissions, fidelity)
+        curvature_info = CurvatureInfo(wd_points, abs_transmissions, threshold)
+        new_wd_points = curvature_info.new_points()
 
     results = Results(wd_points, transmissions, abs_transmissions, params)
     return results
 
-def multi_sweep(eps_array, wd_lower, wd_upper, params, fidelity):
+def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
     multi_results_dict = dict()
 
     #multi_results_list = parallel_map(sweep, eps_array, (wd_lower, wd_upper, params, fidelity), num_cpus = 2)
@@ -147,7 +130,7 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, fidelity):
     #    multi_results_dict[eps] = multi_results_list[index]
 
     for eps in eps_array:
-        multi_results_dict[eps] = sweep(eps, wd_lower, wd_upper, params, fidelity)
+        multi_results_dict[eps] = sweep(eps, wd_lower, wd_upper, params, threshold)
 
     return multi_results_dict
 
@@ -156,11 +139,11 @@ if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
     params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
     eps = 0.0001
-    fidelity = 0.5
+    threshold = 0.001
     wd_lower = 10.4
     wd_upper = 10.55
     eps_array = np.linspace(0.0001, 0.0002, 2)
-    multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, fidelity)
+    multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
     results = multi_results[0.0002]
-    plt.plot(results.wd_points, results.abs_transmissions)
+    plt.scatter(results.wd_points, results.abs_transmissions)
     plt.show()
