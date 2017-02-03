@@ -26,11 +26,11 @@ class Results:
         self.transmissions = transmissions
         self.abs_transmissions = abs_transmissions
 
-
 class CurvatureInfo:
     def __init__(self, wd_points, transmissions, threshold = 0.05):
         self.threshold = threshold
         self.wd_points = wd_points
+        self.new_wd_points_unique = None
         self.transmissions = transmissions
         self.n_points = transmissions.size
         self.curvature_positions, self.curvatures = derivative(wd_points, transmissions, 2)
@@ -45,8 +45,19 @@ class CurvatureInfo:
         self.midpoint_curvatures_normed = self.midpoint_curvatures / self.midpoint_transmissions
         self.midpoints = moving_average(self.wd_points, 2)
         self.intervals = np.diff(self.wd_points)
-        self.number_of_sections_required = \
+        self.num_of_sections_required = \
             np.ceil(self.intervals * np.sqrt(self.midpoint_curvatures_normed / threshold))
+        self.delete = 0
+
+    def new_points(self):
+        new_wd_points = np.array([])
+        for index in np.arange(self.n_points - 1):
+            multi_section = \
+                np.linspace(self.wd_points[index], self.wd_points[index + 1], self.num_of_sections_required[index] + 1)
+            new_wd_points = np.concatenate((new_wd_points, multi_section))
+        unique_set = set(new_wd_points) - set(self.wd_points)
+        self.new_wd_points_unique = np.array(list(unique_set))
+        return self.new_wd_points_unique
 
 
 def moving_average(interval, window_size):
