@@ -36,7 +36,6 @@ class Results:
         return combined_results
 
 
-
 class Queue:
     def __init__(self, wd_points, params):
         self.params = params
@@ -44,13 +43,13 @@ class Queue:
 
 
 class CurvatureInfo:
-    def __init__(self, wd_points, transmissions, threshold = 0.05):
+    def __init__(self, results, threshold = 0.05):
         self.threshold = threshold
-        self.wd_points = wd_points
+        self.wd_points = results.wd_points
         self.new_wd_points_unique = None
-        self.transmissions = transmissions
-        self.n_points = transmissions.size
-        self.curvature_positions, self.curvatures = derivative(wd_points, transmissions, 2)
+        self.transmissions = results.transmissions
+        self.n_points = self.transmissions.size
+        self.curvature_positions, self.curvatures = derivative(results.wd_points, results.abs_transmissions, 2)
         self.mean_curvatures = moving_average(np.absolute(self.curvatures), 2)
         #self.midpoint_curvatures = \
         #    np.concatenate((self.curvatures[0], self.mean_curvatures, self.curvatures[self.n_points - 3]))
@@ -58,7 +57,7 @@ class CurvatureInfo:
             np.concatenate((np.array([self.curvatures[0]]), self.mean_curvatures))
         self.midpoint_curvatures = \
             np.concatenate((self.midpoint_curvatures, np.array([self.curvatures[self.n_points - 3]])))
-        self.midpoint_transmissions = moving_average(self.transmissions, 2)
+        self.midpoint_transmissions = moving_average(results.abs_transmissions, 2)
         self.midpoint_curvatures_normed = self.midpoint_curvatures / self.midpoint_transmissions
         self.midpoints = moving_average(self.wd_points, 2)
         self.intervals = np.diff(self.wd_points)
@@ -127,13 +126,13 @@ def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
     wd_points = np.linspace(wd_lower, wd_upper, 10)
     results = transmission_calc_array(params, wd_points)
-    curvature_info = CurvatureInfo(wd_points, results.abs_transmissions, threshold)
+    curvature_info = CurvatureInfo(results, threshold)
     new_wd_points = curvature_info.new_points()
 
     while (len(new_wd_points) > 0):
         new_results = transmission_calc_array(params, new_wd_points)
         results = results.concatenate(new_results)
-        curvature_info = CurvatureInfo(results.wd_points, results.abs_transmissions, threshold)
+        curvature_info = CurvatureInfo(results, threshold)
         new_wd_points = curvature_info.new_points()
 
     return results
