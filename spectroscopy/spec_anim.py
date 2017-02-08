@@ -4,6 +4,7 @@ from pylab import *
 from scipy.fftpack import fft
 import matplotlib.pyplot as plt
 import yaml
+from scipy.interpolate import interp1d
 
 class parameters:
     def __init__(self, wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels):

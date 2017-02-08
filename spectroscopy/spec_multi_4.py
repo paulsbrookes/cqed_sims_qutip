@@ -4,7 +4,7 @@ from pylab import *
 from scipy.fftpack import fft
 import matplotlib.pyplot as plt
 import yaml
-
+from scipy.interpolate import interp1d
 
 class Parameters:
     def __init__(self, wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels):
@@ -27,12 +27,14 @@ class Results:
         self.abs_transmissions = np.absolute(self.transmissions)
 
     def concatenate(self, results):
+        combined_params = np.concatenate([self.params, results.params])
         combined_wd_points = np.concatenate([self.wd_points, results.wd_points])
         combined_transmissions = np.concatenate([self.transmissions, results.transmissions])
         sort_indices = np.argsort(combined_wd_points)
+        combined_params = combined_params[sort_indices]
         combined_wd_points = combined_wd_points[sort_indices]
         combined_transmissions = combined_transmissions[sort_indices]
-        combined_results = Results(self.params, combined_wd_points, combined_transmissions)
+        combined_results = Results(combined_params, combined_wd_points, combined_transmissions)
         return combined_results
 
 
@@ -42,9 +44,9 @@ class Queue:
         self.wd_points = wd_points
 
     def curvature_generate(self, results, threshold = 0.05):
-        self.params = results.params
         curvature_info = CurvatureInfo(results, threshold)
         self.wd_points = curvature_info.new_points()
+        self.params = hilbert_interpolation(self.wd_points, results)
 
 class CurvatureInfo:
     def __init__(self, results, threshold = 0.05):
@@ -76,6 +78,20 @@ class CurvatureInfo:
         self.new_wd_points_unique = np.array(list(unique_set))
         return self.new_wd_points_unique
 
+def hilbert_interpolation(new_wd_points, results):
+    c_levels_array = np.array([params.c_levels for params in results.params])
+    t_levels_array = np.array([params.t_levels for params in results.params])
+    wd_points = results.wd_points
+    c_interp = interp1d(wd_points, c_levels_array)
+    t_interp = interp1d(wd_points, t_levels_array)
+    base_params = results.params[0]
+    params_list = []
+    for wd in new_wd_points:
+        new_params = base_params
+        new_params.c_levels = int(round(c_interp(wd)))
+        new_params.t_levels = int(round(t_interp(wd)))
+        params_list.append(new_params)
+    return params_list
 
 def moving_average(interval, window_size):
     window = np.ones(int(window_size)) / float(window_size)
@@ -104,15 +120,18 @@ def hamiltonian(params, wd):
     return H
 
 def transmission_calc_array(queue):
-
-    transmissions = parallel_map(transmission_calc, queue.wd_points, (queue.params,), num_cpus = 10)
+    args = []
+    for index, value in enumerate(queue.wd_points):
+        args.append([value, queue.params[index]])
+    transmissions = parallel_map(transmission_calc, args, num_cpus = 10)
     transmissions = np.array(transmissions)
     results = Results(queue.params, queue.wd_points, transmissions)
 
     return results
 
-def transmission_calc(wd, params):
-
+def transmission_calc(args):
+    wd = args[0]
+    params = args[1]
     a = tensor(destroy(params.c_levels), qeye(params.t_levels))
     sm = tensor(qeye(params.c_levels), destroy(params.t_levels))
     c_ops = []
@@ -127,7 +146,8 @@ def transmission_calc(wd, params):
 def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
     wd_points = np.linspace(wd_lower, wd_upper, 10)
-    queue = Queue(params, wd_points)
+    params_list = [params for wd in wd_points]
+    queue = Queue(params_list, wd_points)
     results = transmission_calc_array(queue)
     new_queue = Queue()
     new_queue.curvature_generate(results, threshold)
