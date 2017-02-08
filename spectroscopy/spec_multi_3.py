@@ -37,34 +37,36 @@ class Results:
 
 
 class Queue:
-    def __init__(self, wd_points, params):
+    def __init__(self, wd_points = None, params = None):
         self.params = params
         self.wd_points = wd_points
 
+    def curvature_generate(self, results, threshold = 0.05):
+        self.params = params
+        curvature_info = CurvatureInfo(results, threshold)
+        self.wd_points = curvature_info.new_points()
 
 class CurvatureInfo:
     def __init__(self, results, threshold = 0.05):
         self.threshold = threshold
         self.wd_points = results.wd_points
         self.new_wd_points_unique = None
-        self.transmissions = results.transmissions
-        self.n_points = self.transmissions.size
-        self.curvature_positions, self.curvatures = derivative(results.wd_points, results.abs_transmissions, 2)
+        self.abs_transmissions = results.abs_transmissions
+        self.n_points = self.abs_transmissions.size
+
+    def new_points(self):
+        self.curvature_positions, self.curvatures = derivative(self.wd_points, self.abs_transmissions, 2)
         self.mean_curvatures = moving_average(np.absolute(self.curvatures), 2)
-        #self.midpoint_curvatures = \
-        #    np.concatenate((self.curvatures[0], self.mean_curvatures, self.curvatures[self.n_points - 3]))
         self.midpoint_curvatures = \
             np.concatenate((np.array([self.curvatures[0]]), self.mean_curvatures))
         self.midpoint_curvatures = \
             np.concatenate((self.midpoint_curvatures, np.array([self.curvatures[self.n_points - 3]])))
-        self.midpoint_transmissions = moving_average(results.abs_transmissions, 2)
+        self.midpoint_transmissions = moving_average(self.abs_transmissions, 2)
         self.midpoint_curvatures_normed = self.midpoint_curvatures / self.midpoint_transmissions
         self.midpoints = moving_average(self.wd_points, 2)
         self.intervals = np.diff(self.wd_points)
         self.num_of_sections_required = \
             np.ceil(self.intervals * np.sqrt(self.midpoint_curvatures_normed / threshold))
-
-    def new_points(self):
         new_wd_points = np.array([])
         for index in np.arange(self.n_points - 1):
             multi_section = \
