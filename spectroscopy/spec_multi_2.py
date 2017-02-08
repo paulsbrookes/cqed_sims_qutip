@@ -26,6 +26,7 @@ class Results:
         self.transmissions = transmissions
         self.abs_transmissions = abs_transmissions
 
+
 class CurvatureInfo:
     def __init__(self, wd_points, transmissions, threshold = 0.05):
         self.threshold = threshold
@@ -47,7 +48,6 @@ class CurvatureInfo:
         self.intervals = np.diff(self.wd_points)
         self.num_of_sections_required = \
             np.ceil(self.intervals * np.sqrt(self.midpoint_curvatures_normed / threshold))
-        self.delete = 0
 
     def new_points(self):
         new_wd_points = np.array([])

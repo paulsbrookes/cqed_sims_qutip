@@ -27,6 +27,12 @@ class Results:
         self.abs_transmissions = abs_transmissions
 
 
+class Queue:
+    def __init__(self, wd_points, params):
+        self.params = params
+        self.wd_points = wd_points
+
+
 class CurvatureInfo:
     def __init__(self, wd_points, transmissions, threshold = 0.05):
         self.threshold = threshold
@@ -91,9 +97,6 @@ def transmission_calc_array(params, wd_points):
     transmissions = parallel_map(transmission_calc, wd_points, (params,), num_cpus = 10)
     transmissions = np.array(transmissions)
 
-#    transmissions = [transmission_calc(wd, params) for wd in wd_points]
-#    transmissions = np.array(transmissions)
-
     return transmissions
 
 def transmission_calc(wd, params):
@@ -150,7 +153,7 @@ if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
     params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
     eps = 0.0001
-    threshold = 0.001
+    threshold = 0.01
     wd_lower = 10.4
     wd_upper = 10.55
     eps_array = np.linspace(0.0001, 0.0002, 2)
