@@ -20,11 +20,21 @@ class Parameters:
 
 
 class Results:
-    def __init__(self, wd_points, transmissions, abs_transmissions, params):
+    def __init__(self, params, wd_points, transmissions):
         self.params = params
         self.wd_points = wd_points
         self.transmissions = transmissions
-        self.abs_transmissions = abs_transmissions
+        self.abs_transmissions = np.absolute(self.transmissions)
+
+    def concatenate(self, results):
+        combined_wd_points = np.concatenate([self.wd_points, results.wd_points])
+        combined_transmissions = np.concatenate([self.transmissions, results.transmissions])
+        sort_indices = np.argsort(combined_wd_points)
+        combined_wd_points = combined_wd_points[sort_indices]
+        combined_transmissions = combined_transmissions[sort_indices]
+        combined_results = Results(self.params, combined_wd_points, combined_transmissions)
+        return combined_results
+
 
 
 class Queue:
@@ -96,8 +106,9 @@ def transmission_calc_array(params, wd_points):
 
     transmissions = parallel_map(transmission_calc, wd_points, (params,), num_cpus = 10)
     transmissions = np.array(transmissions)
+    results = Results(params, wd_points, transmissions)
 
-    return transmissions
+    return results
 
 def transmission_calc(wd, params):
 
@@ -115,25 +126,16 @@ def transmission_calc(wd, params):
 def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
     wd_points = np.linspace(wd_lower, wd_upper, 10)
-    transmissions = transmission_calc_array(params, wd_points)
-    abs_transmissions = np.absolute(transmissions)
-    curvature_info = CurvatureInfo(wd_points, abs_transmissions, threshold)
+    results = transmission_calc_array(params, wd_points)
+    curvature_info = CurvatureInfo(wd_points, results.abs_transmissions, threshold)
     new_wd_points = curvature_info.new_points()
 
     while (len(new_wd_points) > 0):
-        new_transmissions = transmission_calc_array(params, new_wd_points)
-        new_abs_transmissions = np.absolute(new_transmissions)
-        wd_points = np.concatenate([wd_points, new_wd_points])
-        transmissions = concatenate([transmissions, new_transmissions])
-        abs_transmissions = concatenate([abs_transmissions, new_abs_transmissions])
-        sort_indices = np.argsort(wd_points)
-        wd_points = wd_points[sort_indices]
-        transmissions = transmissions[sort_indices]
-        abs_transmissions = abs_transmissions[sort_indices]
-        curvature_info = CurvatureInfo(wd_points, abs_transmissions, threshold)
+        new_results = transmission_calc_array(params, new_wd_points)
+        results = results.concatenate(new_results)
+        curvature_info = CurvatureInfo(results.wd_points, results.abs_transmissions, threshold)
         new_wd_points = curvature_info.new_points()
 
-    results = Results(wd_points, transmissions, abs_transmissions, params)
     return results
 
 def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
