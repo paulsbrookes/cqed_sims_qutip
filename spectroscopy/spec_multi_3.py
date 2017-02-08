@@ -37,12 +37,12 @@ class Results:
 
 
 class Queue:
-    def __init__(self, wd_points = None, params = None):
+    def __init__(self, params = None, wd_points = None):
         self.params = params
         self.wd_points = wd_points
 
     def curvature_generate(self, results, threshold = 0.05):
-        self.params = params
+        self.params = results.params
         curvature_info = CurvatureInfo(results, threshold)
         self.wd_points = curvature_info.new_points()
 
@@ -103,11 +103,11 @@ def hamiltonian(params, wd):
         + params.eps * (a + a.dag())
     return H
 
-def transmission_calc_array(params, wd_points):
+def transmission_calc_array(queue):
 
-    transmissions = parallel_map(transmission_calc, wd_points, (params,), num_cpus = 10)
+    transmissions = parallel_map(transmission_calc, queue.wd_points, (queue.params,), num_cpus = 10)
     transmissions = np.array(transmissions)
-    results = Results(params, wd_points, transmissions)
+    results = Results(queue.params, queue.wd_points, transmissions)
 
     return results
 
@@ -127,15 +127,15 @@ def transmission_calc(wd, params):
 def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
     wd_points = np.linspace(wd_lower, wd_upper, 10)
-    results = transmission_calc_array(params, wd_points)
-    curvature_info = CurvatureInfo(results, threshold)
-    new_wd_points = curvature_info.new_points()
+    queue = Queue(params, wd_points)
+    results = transmission_calc_array(queue)
+    new_queue = Queue()
+    new_queue.curvature_generate(results, threshold)
 
-    while (len(new_wd_points) > 0):
-        new_results = transmission_calc_array(params, new_wd_points)
+    while (len(new_queue.wd_points) > 0):
+        new_results = transmission_calc_array(new_queue)
         results = results.concatenate(new_results)
-        curvature_info = CurvatureInfo(results, threshold)
-        new_wd_points = curvature_info.new_points()
+        new_queue.curvature_generate(results, threshold)
 
     return results
 
