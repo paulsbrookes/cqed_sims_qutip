@@ -28,6 +28,7 @@ class Results:
         self.edge_occupations_c = edge_occupations_c
         self.edge_occupations_t = edge_occupations_t
         self.abs_transmissions = np.absolute(self.transmissions)
+        self.size = self.wd_points.size
 
     def concatenate(self, results):
         combined_params = np.concatenate([self.params, results.params])
@@ -45,11 +46,22 @@ class Results:
                                    combined_transmissions, combined_edge_occupations_c, combined_edge_occupations_t)
         return combined_results
 
+    def delete(self, indices):
+        reduced_params = np.delete(self.params, indices)
+        reduced_wd_points = np.delete(self.wd_points, indices)
+        reduced_transmissions = np.delete(self.transmissions, indices)
+        reduced_edge_occupations_c = np.delete(self.edge_occupations_c, indices)
+        reduced_edge_occupations_t = np.delete(self.edge_occupations_t, indices)
+        reduced_results = Results(reduced_params, reduced_wd_points,
+                                  reduced_transmissions, reduced_edge_occupations_c, reduced_edge_occupations_t)
+        return reduced_results
+
+
 
 
 
 class Queue:
-    def __init__(self, params = [], wd_points = np.array([])):
+    def __init__(self, params = np.array([]), wd_points = np.array([])):
         self.params = params
         self.wd_points = wd_points
         self.size = self.wd_points.size
@@ -63,12 +75,14 @@ class Queue:
     def hilbert_generate(self, results, threshold_c, threshold_t):
         self.wd_points = []
         self.params = []
+        delete_indices = []
         for index, params in enumerate(results.params):
             threshold_c_weighted = threshold_c / params.c_levels
             threshold_t_weighted = threshold_t / params.t_levels
             overload_c = (results.edge_occupations_c[index] > threshold_c_weighted)
             overload_t = (results.edge_occupations_t[index] > threshold_t_weighted)
             if overload_c or overload_t:
+                delete_indices.append(index)
                 self.wd_points.append(results.wd_points[index])
                 params_copy = results.params[index]
                 if overload_c:
@@ -79,7 +93,11 @@ class Queue:
                         size_correction(results.edge_occupations_t[index], params_copy.t_levels, threshold_t_weighted / 2)
                 self.params.append(params_copy)
         self.wd_points = np.array(self.wd_points)
+        self.params = np.array(self.params)
         self.size = self.wd_points.size
+        delete_indices = np.array(delete_indices)
+        reduced_results = results.delete(delete_indices)
+        return reduced_results
 
 
 class CurvatureInfo:
@@ -142,7 +160,8 @@ def hilbert_interpolation(new_wd_points, results):
         new_params.c_levels = int(round(c_interp(wd)))
         new_params.t_levels = int(round(t_interp(wd)))
         params_list.append(new_params)
-    return params_list
+    params_array = np.array(params_list)
+    return params_array
 
 def moving_average(interval, window_size):
     window = np.ones(int(window_size)) / float(window_size)
@@ -211,18 +230,23 @@ def sweep(eps, wd_lower, wd_upper, params, threshold):
     results = transmission_calc_array(queue)
     new_queue = Queue()
     new_queue.curvature_generate(results, threshold)
-
+    curvature_num = 1
     while (new_queue.size > 0):
+        #print curvature_num
         new_results = transmission_calc_array(new_queue)
         results = results.concatenate(new_results)
 
-        new_queue.hilbert_generate(results, 0.01, 0.01)
+        before = results.wd_points
+        results = new_queue.hilbert_generate(results, 0.01, 0.01)
         while (new_queue.size > 0):
             new_results = transmission_calc_array(new_queue)
             results = results.concatenate(new_results)
-            new_queue.hilbert_generate(results, 0.01, 0.01)
-
+            results = new_queue.hilbert_generate(results, 0.01, 0.01)
+            print "hilbert"
+        after = results.wd_points
+        print np.all(after == before)
         new_queue.curvature_generate(results, threshold)
+        curvature_num = curvature_num + 1
 
     return results
 
@@ -238,12 +262,11 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
 if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
     params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
-    eps = 0.0001
-    threshold = 1.
+    threshold = 0.01
     wd_lower = 10.4
     wd_upper = 10.55
-    eps_array = np.linspace(0.0001, 0.0002, 2)
+    eps_array = np.linspace(0.0002, 0.0002, 1)
     multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
-    results = multi_results[0.0001]
+    results = multi_results[0.0002]
     plt.scatter(results.wd_points, results.abs_transmissions)
     plt.show()
