@@ -126,7 +126,7 @@ def transmission_calc(wd, params):
 
 def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
-    wd_points = np.linspace(wd_lower, wd_upper, 10)
+    wd_points = np.linspace(wd_lower, wd_upper, 16)
     queue = Queue(params, wd_points)
     results = transmission_calc_array(queue)
     new_queue = Queue()
@@ -154,12 +154,12 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
 
 if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+    params = Parameters(10.3641, 9.4914, 0.0001, 0.389, -0.097, 0.00146, 0.000833, 3, 10)
     eps = 0.0001
     threshold = 0.01
     wd_lower = 10.4
     wd_upper = 10.55
-    eps_array = np.linspace(0.0001, 0.0002, 2)
+    eps_array = np.linspace(0.0002, 0.0002, 1)
     multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
     results = multi_results[0.0002]
     plt.scatter(results.wd_points, results.abs_transmissions)
