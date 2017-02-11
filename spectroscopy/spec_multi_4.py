@@ -129,36 +129,6 @@ class Queue:
             self.size = 0
             return results
 
-    def hilbert_generate_elementwise(self, results, threshold_c, threshold_t):
-        self.wd_points = []
-        self.params = []
-        delete_indices = []
-        for index, params in enumerate(results.params):
-            threshold_c_weighted = threshold_c / params.c_levels
-            threshold_t_weighted = threshold_t / params.t_levels
-            overload_c = (results.edge_occupations_c[index] > threshold_c_weighted)
-            overload_t = (results.edge_occupations_t[index] > threshold_t_weighted)
-            if overload_c or overload_t:
-                delete_indices.append(index)
-                self.wd_points.append(results.wd_points[index])
-                params_copy = results.params[index].copy()
-                if overload_c:
-                    params_copy.c_levels = \
-                        size_correction(results.edge_occupations_c[index], params_copy.c_levels, threshold_c_weighted / 2)
-                if overload_t:
-                    params_copy.t_levels = \
-                        size_correction(results.edge_occupations_t[index], params_copy.t_levels, threshold_t_weighted / 2)
-                self.params.append(params_copy)
-        self.wd_points = np.array(self.wd_points)
-        self.params = np.array(self.params)
-        sort_indices = np.argsort(self.wd_points)
-        self.wd_points = self.wd_points[sort_indices]
-        self.params = self.params[sort_indices]
-        self.size = self.wd_points.size
-        delete_indices = np.array(delete_indices)
-        reduced_results = results.delete(delete_indices)
-        return reduced_results
-
 
 class CurvatureInfo:
     def __init__(self, results, threshold = 0.05):
