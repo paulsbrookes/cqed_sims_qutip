@@ -20,7 +20,7 @@ class Parameters:
         self.c_levels = c_levels
 
     def copy(self):
-        params = Parameters(self.wc, self.wq, self.eps, self.g, self.chi, self.gamma, self.kappa, self.t_levels, self.c_levels)
+        params = Parameters(self.wc, self.wq, self.eps, self.g, self.chi, self.kappa, self.gamma, self.t_levels, self.c_levels)
         return params
 
 
@@ -69,9 +69,6 @@ class Results:
     def queue(self):
         queue = Queue(self.params, self.wd_points)
         return queue
-
-
-
 
 
 class Queue:
@@ -248,7 +245,7 @@ def transmission_calc(args):
 
 def sweep(eps, wd_lower, wd_upper, params, threshold):
     params.eps = eps
-    wd_points = np.linspace(wd_lower, wd_upper, 1)
+    wd_points = np.linspace(wd_lower, wd_upper, 16)
     params_array = np.array([params.copy() for wd in wd_points])
     queue = Queue(params_array, wd_points)
     results = transmission_calc_array(queue)
@@ -262,19 +259,19 @@ def sweep(eps, wd_lower, wd_upper, params, threshold):
 
         #before = results.wd_points
         #results_1 = results
-        #results = new_queue.hilbert_generate(results, 0.005, 0.009)
+        results = new_queue.hilbert_generate(results, 0.005, 0.0005)
         #results_2 = results
-        #while (new_queue.size > 0):
-        #    print "hilbert"
-        #    new_results = transmission_calc_array(new_queue)
-        #    results = results.concatenate(new_results)
-        #    results = new_queue.hilbert_generate(results, 0.005, 0.009)
+        while (new_queue.size > 0):
+            print "hilbert"
+            new_results = transmission_calc_array(new_queue)
+            results = results.concatenate(new_results)
+            results = new_queue.hilbert_generate(results, 0.005, 0.0005)
 
         after = results.wd_points
         new_queue.curvature_generate(results, threshold)
         curvature_num = curvature_num + 1
-    #t_levels = [parameters.t_levels for parameters in results.params]
-    #c_levels = [parameters.c_levels for parameters in results.params]
+    t_levels = [parameters.t_levels for parameters in results.params]
+    c_levels = [parameters.c_levels for parameters in results.params]
     #check_queue = results.queue()
     #check_results = transmission_calc_array(check_queue)
     #return check_results
@@ -291,12 +288,10 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
 
 if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = Parameters(10.3641, 9.4914, 0.0002, 0.389, -0.097, 0.00146, 0.000833, 3, 10)
+    params = Parameters(10.3641, 9.4914, 0.0002, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
     threshold = 0.01
-    wd_lower = 10.51
-    wd_upper = 10.51
-    check = transmission_calc([10.51, params])
-    check_abs_transmission = np.absolute(check[0])
+    wd_lower = 10.4
+    wd_upper = 10.55
     eps_array = np.linspace(0.0002, 0.0002, 1)
     multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
     results = multi_results[0.0002]
