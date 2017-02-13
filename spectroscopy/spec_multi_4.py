@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 from qutip import *
 from pylab import *
 from scipy.fftpack import fft
@@ -129,6 +130,34 @@ class Queue:
             self.size = 0
             return results
 
+    def hilbert_generate_alternate(self, results, threshold_c, threshold_t):
+        old_c_levels = np.zeros(results.size)
+        suggested_c_levels = np.zeros(results.size)
+        old_t_levels = np.zeros(results.size)
+        suggested_t_levels = np.zeros(results.size)
+        for index, params_instance in enumerate(results.params):
+            suggested_c_levels[index] = \
+                size_suggestion(results.edge_occupations_c[index], params_instance.c_levels, threshold_c)
+            old_c_levels[index] = params_instance.c_levels
+            suggested_t_levels[index] = \
+                size_suggestion(results.edge_occupations_t[index], params_instance.t_levels, threshold_t)
+            old_t_levels[index] = params_instance.t_levels
+        if np.any(suggested_c_levels > old_c_levels) or np.any(suggested_t_levels > old_t_levels):
+            c_levels_new = np.max(suggested_c_levels)
+            t_levels_new = np.max(suggested_t_levels)
+            self.wd_points = results.wd_points
+            for index, params_instance in enumerate(results.params):
+                results.params[index].t_levels = t_levels_new
+                results.params[index].c_levels = c_levels_new
+            self.params = results.params
+            self.size = results.size
+            return Results()
+        else:
+            self.wd_points = np.array([])
+            self.params = np.array([])
+            self.size = 0
+            return results
+
 
 class CurvatureInfo:
     def __init__(self, results, threshold = 0.05):
@@ -140,11 +169,12 @@ class CurvatureInfo:
 
     def new_points(self):
         self.curvature_positions, self.curvatures = derivative(self.wd_points, self.abs_transmissions, 2)
-        self.mean_curvatures = moving_average(np.absolute(self.curvatures), 2)
+        self.abs_curvatures = np.absolute(self.curvatures)
+        self.mean_curvatures = moving_average(self.abs_curvatures, 2)
         self.midpoint_curvatures = \
-            np.concatenate((np.array([self.curvatures[0]]), self.mean_curvatures))
+            np.concatenate((np.array([self.abs_curvatures[0]]), self.mean_curvatures))
         self.midpoint_curvatures = \
-            np.concatenate((self.midpoint_curvatures, np.array([self.curvatures[self.n_points - 3]])))
+            np.concatenate((self.midpoint_curvatures, np.array([self.abs_curvatures[self.n_points - 3]])))
         self.midpoint_transmissions = moving_average(self.abs_transmissions, 2)
         self.midpoint_curvatures_normed = self.midpoint_curvatures / self.midpoint_transmissions
         self.midpoints = moving_average(self.wd_points, 2)
@@ -161,8 +191,14 @@ class CurvatureInfo:
         return self.new_wd_points_unique
 
 
+def size_suggestion(edge_occupation, size, threshold):
+    beta = fsolve(zero_func, 1, args=(edge_occupation, size - 1, size))
+    new_size = - np.log(threshold) / beta
+    new_size = int(np.ceil(new_size))
+    return new_size
+
 def size_correction(edge_occupation, size, threshold):
-    beta = fsolve(zero_func, 0.01, args=(edge_occupation, size, size))
+    beta = fsolve(zero_func, 1, args=(edge_occupation, size - 1, size))
     new_size = 1 + np.log((1 - np.exp(-beta)) / threshold) / beta
     new_size = int(np.ceil(new_size))
     return new_size
@@ -173,7 +209,7 @@ def exponential_occupation(n, beta, size):
     return f
 
 def zero_func(beta, p, level, size):
-    f = exponential_occupation(level - 1, beta, size)
+    f = exponential_occupation(level, beta, size)
     f = f - p
     return f
 
@@ -223,7 +259,7 @@ def transmission_calc_array(queue):
     args = []
     for index, value in enumerate(queue.wd_points):
         args.append([value, queue.params[index]])
-    steady_states = parallel_map(transmission_calc, args, num_cpus = 10)
+    steady_states = parallel_map(transmission_calc, args, num_cpus=10)
     transmissions = np.array([steady_state[0] for steady_state in steady_states])
     edge_occupations_c = np.array([steady_state[1] for steady_state in steady_states])
     edge_occupations_c = np.absolute(edge_occupations_c)
@@ -253,17 +289,18 @@ def transmission_calc(args):
 
     return np.array([transmission, edge_occupation_c, edge_occupation_t])
 
-def sweep(eps, wd_lower, wd_upper, params, threshold, guide=Results()):
-    threshold_c = 0.005
-    threshold_t = 0.005
+def sweep(eps, wd_lower, wd_upper, params, threshold):
+    threshold_c = 0.001
+    threshold_t = 0.001
     params.eps = eps
-    wd_points = np.linspace(wd_lower, wd_upper, 11)
+    wd_points = np.linspace(wd_lower, wd_upper, 10)
     params_array = np.array([params.copy() for wd in wd_points])
     queue = Queue(params_array, wd_points)
     curvature_iterations = 0
     results = Results()
 
     while (queue.size > 0) and (curvature_iterations < 10):
+        print curvature_iterations
         curvature_iterations = curvature_iterations + 1
         new_results = transmission_calc_array(queue)
         results = results.concatenate(new_results)
@@ -283,18 +320,27 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
 
     for eps in eps_array:
         multi_results_dict[eps] = sweep(eps, wd_lower, wd_upper, params, threshold)
+        params = multi_results_dict[eps].params[0]
+        print params.c_levels
+        print params.t_levels
 
     return multi_results_dict
 
 
 if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    params = Parameters(10.3641, 9.4914, 0.0002, 0.389, -0.097, 0.00146, 0.000833, 2, 10)
+    params = Parameters(10.3641, 9.4914, 0.0002, 0.389, -0.097, 0.00146, 0.000833, 2, 5)
     threshold = 0.01
     wd_lower = 10.4
     wd_upper = 10.55
-    eps_array = np.linspace(0.0002, 0.0002, 1)
+    eps_array = np.array([0.0002])
     multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
+    with open('data.yml', 'w') as outfile:
+        yaml.dump(multi_results, outfile, default_flow_style=False)
+    multi_results = []
+    multi_results = yaml.load(open('data.yml'))
     results = multi_results[0.0002]
+    print results.params[0].t_levels
+    print results.params[0].c_levels
     plt.scatter(results.wd_points, results.abs_transmissions)
     plt.show()
