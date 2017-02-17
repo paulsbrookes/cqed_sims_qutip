@@ -333,22 +333,17 @@ def multi_sweep(eps_array, wd_lower, wd_upper, params, threshold):
 
 if __name__ == '__main__':
     #wc, wq, eps, g, chi, kappa, gamma, t_levels, c_levels
-    t_levels = 2
-    c_levels = 10
-    params = Parameters(10.4267, 9.39128, 0.0002, 0.3096, -0.097, 0.00146, 0.000833, t_levels, c_levels)
-    threshold = 0.01
-    wd_lower = 10.495
-    wd_upper = 10.520
-    eps = 0.008
-    eps_array = np.array([eps])
-    multi_results = multi_sweep(eps_array, wd_lower, wd_upper, params, threshold)
-    #with open('data.yml', 'w') as outfile:
-    #    yaml.dump(multi_results, outfile, default_flow_style=False)
-    #multi_results = []
-    #multi_results = yaml.load(open('data.yml'))
-    results = multi_results[eps]
-    print results.params[0].t_levels
-    print results.params[0].c_levels
+    t_levels = 6
+    c_levels = 25
+    params = Parameters(10.4267, 9.39128, 0.006, 0.3096, -0.097, 0.00146, 0.000833, t_levels, c_levels)
+    num_points = 10
+    wd_lower = 10.5
+    wd_upper = 10.54
+    wd_points = np.linspace(wd_lower, wd_upper, num_points)
+    params_array = np.array([params.copy() for wd in wd_points])
+    queue = Queue(params_array, wd_points)
+    results = transmission_calc_array(queue)
+    np.savetxt("frequencies.csv", results.wd_points, delimiter=",")
+    np.savetxt("abs_transmissions.csv", results.abs_transmissions, delimiter=",")
     plt.scatter(results.wd_points, results.abs_transmissions)
-    plt.title('txc: ' + str(t_levels) + 'x' + str(c_levels))
     plt.show()

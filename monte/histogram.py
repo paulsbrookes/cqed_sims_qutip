@@ -2,7 +2,7 @@ from qutip import *
 import matplotlib.pyplot as plt
 import numpy as np
 
-folder_path = '/homes/pbrookes/PycharmProjects/cqed/cqed_simulations_qutip/results/crosscheck/2017-01-26--16-13-36'
+folder_path = '/homes/pbrookes/PycharmProjects/cqed_sims_qutip/monte/results/test/2017-02-16--21-49-58'
 expectations_path = folder_path + '/expectations'
 expectations = qload(expectations_path)
 probabilities = np.array([expectations[x] for x in range(0, len(expectations))]);
