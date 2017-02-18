@@ -54,7 +54,7 @@ def solution(sys_params, hilbert_dims, initial_state, sim_options):
     H = hamiltonian(sys_params, hilbert_dims)
     c_ops = collapse_operators(sys_params, hilbert_dims)
     snapshot_times = linspace(0, sim_options.end_time, sim_options.n_snaps)
-    output = mcsolve(H, initial_state, snapshot_times, c_ops, sim_options.m_ops, ntraj=sim_options.n_traj)
+    output = mesolve(H, initial_state, snapshot_times, c_ops, sim_options.m_ops)
     return output
 
 if __name__ == '__main__':
@@ -64,12 +64,12 @@ if __name__ == '__main__':
              for x in range(hilbert_dims.c_levels)]
     a = tensor(destroy(hilbert_dims.c_levels), qeye(hilbert_dims.t_levels))
     #m_ops = [a]
-    sim_options = simulation_options(50000, 200, m_ops, 1000)
+    sim_options = simulation_options(2000, 200, m_ops, 1000)
     initial_state = tensor(basis(hilbert_dims.c_levels, 0), basis(hilbert_dims.t_levels, 0))
     output = solution(sys_params, hilbert_dims, initial_state, sim_options)
     time = datetime.now()
     time_string = time.strftime('%Y-%m-%d--%H-%M-%S')
-    folder = 'test'
+    folder = 'crosscheck'
     path = '/homes/pbrookes/PycharmProjects/cqed_sims_qutip/monte/results/' + folder + '/' + time_string + '/'
     if not os.path.exists(path):
         os.makedirs(path)

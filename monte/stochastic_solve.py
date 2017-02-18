@@ -28,11 +28,12 @@ class hilbert_dimensions:
         self.t_levels = t_levels
 
 class simulation_options:
-    def __init__(self, end_time, n_snaps, m_ops, n_traj = 50):
+    def __init__(self, end_time, n_snaps, m_ops, n_substeps, n_traj = 50):
         self.end_time = end_time
         self.n_snaps = n_snaps
         self.m_ops = m_ops
         self.n_traj = n_traj
+        self.n_substeps = n_substeps
 
 def hamiltonian(sys_params, hilbert_dims):
     a = tensor(destroy(hilbert_dims.c_levels), qeye(hilbert_dims.t_levels))
@@ -54,22 +55,30 @@ def solution(sys_params, hilbert_dims, initial_state, sim_options):
     H = hamiltonian(sys_params, hilbert_dims)
     c_ops = collapse_operators(sys_params, hilbert_dims)
     snapshot_times = linspace(0, sim_options.end_time, sim_options.n_snaps)
-    output = mcsolve(H, initial_state, snapshot_times, c_ops, sim_options.m_ops, ntraj=sim_options.n_traj)
+    output = ssesolve(H, initial_state, snapshot_times, c_ops, sim_options.m_ops, method='homodyne', ntraj=sim_options.n_traj, nsubsteps=sim_options.n_substeps, solver='platen')
     return output
 
 if __name__ == '__main__':
-    sys_params = system_parameters(10.4267, 9.39128, 0.3096, -0.097, 0.004, 10.50662, 0.00146, 0.000833)
+    sys_params = system_parameters(10.4267, 9.39128, 0.3096, -0.097, 0.004, 10.5066, 0.00146, 0.000833)
     hilbert_dims = hilbert_dimensions(20, 5)
     m_ops = [tensor(fock_dm(hilbert_dims.c_levels, x), qeye(hilbert_dims.t_levels)) \
              for x in range(hilbert_dims.c_levels)]
     a = tensor(destroy(hilbert_dims.c_levels), qeye(hilbert_dims.t_levels))
     #m_ops = [a]
-    sim_options = simulation_options(2000, 200, m_ops, 1000)
+
+    steps_major = 200
+    steps_total = 50000
+    steps_sub = steps_total / steps_major
+    snapshots = steps_major
+    trajectories = 1
+    endtime = 1000
+
+    sim_options = simulation_options(endtime, snapshots, m_ops, steps_sub, trajectories)
     initial_state = tensor(basis(hilbert_dims.c_levels, 0), basis(hilbert_dims.t_levels, 0))
     output = solution(sys_params, hilbert_dims, initial_state, sim_options)
     time = datetime.now()
     time_string = time.strftime('%Y-%m-%d--%H-%M-%S')
-    folder = 'crosscheck'
+    folder = 'delete'
     path = '/homes/pbrookes/PycharmProjects/cqed_sims_qutip/monte/results/' + folder + '/' + time_string + '/'
     if not os.path.exists(path):
         os.makedirs(path)
